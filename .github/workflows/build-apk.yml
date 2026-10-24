@@ -1,0 +1,69 @@
+name: Compiler l'APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Préparer l'application web (bibliothèques et langues hors ligne)
+        run: |
+          npm init -y
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/filesystem@6 @capacitor/share@6 \
+            tesseract.js@5.1.1 tesseract.js-core@5.1.1 pdfjs-dist@3.11.174 jspdf@2.5.1 jszip@3.10.1
+          mkdir -p www/lib www/tesseract www/tessdata
+          cp index.html style.css app.js www/
+          cp node_modules/pdfjs-dist/build/pdf.min.js node_modules/pdfjs-dist/build/pdf.worker.min.js www/lib/
+          cp node_modules/jspdf/dist/jspdf.umd.min.js www/lib/
+          cp node_modules/jszip/dist/jszip.min.js www/lib/
+          cp node_modules/tesseract.js/dist/tesseract.min.js node_modules/tesseract.js/dist/worker.min.js www/tesseract/
+          cp node_modules/tesseract.js-core/tesseract-core* www/tesseract/
+          curl -fL -o www/tessdata/fra.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/fra.traineddata
+          curl -fL -o www/tessdata/eng.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata
+          test "$(stat -c%s www/tessdata/fra.traineddata)" -gt 1000000
+          test "$(stat -c%s www/tessdata/eng.traineddata)" -gt 1000000
+          ls -la www www/lib www/tesseract www/tessdata
+
+      - name: Créer le projet Android
+        run: |
+          echo '{"appId":"com.mohamed.ocrpdf","appName":"OCR PDF","webDir":"www"}' > capacitor.config.json
+          npx cap add android
+          npx cap sync android
+
+      - name: Compiler l'APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Renommer l'APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk OCR-PDF.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OCR-PDF-apk
+          path: OCR-PDF.apk
+
+      - name: Publier dans « Releases »
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: OCR PDF (version ${{ github.run_number }})
+          files: OCR-PDF.apk
