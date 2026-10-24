@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f4e79">
+<title>OCR PDF</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>OCR PDF</h1>
+  <span id="statut">Prêt</span>
+</header>
+
+<main>
+
+<!-- ============ SOURCE ============ -->
+<section id="tab-source" class="tab active">
+  <label class="fichier-btn" for="fichier">📄 Choisir un PDF ou des images</label>
+  <input type="file" id="fichier" accept="application/pdf,image/*" multiple hidden>
+  <p id="infoFichier" class="info">Aucun fichier sélectionné.</p>
+
+  <div class="grille">
+    <label>Langue de reconnaissance
+      <select id="langOcr" data-reg="langOcr">
+        <option value="fra+eng">Français + Anglais</option>
+        <option value="fra">Français</option>
+        <option value="eng">Anglais</option>
+      </select>
+    </label>
+    <label>Mode
+      <select id="modeOcr" data-reg="mode">
+        <option value="auto">Auto (texte intégré du PDF s'il existe)</option>
+        <option value="force">Toujours reconnaître (OCR)</option>
+      </select>
+    </label>
+    <label>Pages du PDF
+      <input type="text" id="plage" placeholder="ex. 1-5, 8 (vide = toutes)">
+    </label>
+    <label>Qualité de numérisation
+      <select id="resolution" data-reg="resolution">
+        <option value="2">Rapide (144 dpi)</option>
+        <option value="3">Standard (216 dpi)</option>
+        <option value="4">Précise (288 dpi)</option>
+      </select>
+    </label>
+    <label>Prétraitement de l'image
+      <select id="prepro" data-reg="prepro">
+        <option value="aucun">Aucun</option>
+        <option value="gris">Gris + contraste</option>
+        <option value="nb">Noir et blanc (documents pâles)</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="rangee">
+    <button id="btnLancer" class="primaire">▶ Lancer la reconnaissance</button>
+    <button id="btnAnnuler" class="danger" hidden>Annuler</button>
+  </div>
+  <progress id="barre" value="0" max="100" hidden></progress>
+  <p id="detailProgres" class="info"></p>
+</section>
+
+<!-- ============ TEXTE ============ -->
+<section id="tab-texte" class="tab">
+  <div class="rangee">
+    <button id="btnCopier">Copier</button>
+    <button id="btnPartagerTexte">Partager</button>
+    <button id="btnNettoyer">Nettoyer</button>
+    <button id="btnAnnulerTexte">↶ Annuler</button>
+  </div>
+  <textarea id="texte" rows="14" placeholder="Le texte reconnu apparaît ici. Vous pouvez le corriger directement." spellcheck="false"></textarea>
+  <p id="stats" class="info"></p>
+
+  <details>
+    <summary>Rechercher / remplacer</summary>
+    <div class="grille">
+      <input type="text" id="chercher" placeholder="Rechercher">
+      <input type="text" id="remplacer" placeholder="Remplacer par">
+      <button id="btnRemplacer">Tout remplacer</button>
+    </div>
+  </details>
+
+  <h2>Lecture vocale</h2>
+  <div class="tts" data-cible="texte"></div>
+</section>
+
+<!-- ============ TRADUCTION ============ -->
+<section id="tab-traduction" class="tab">
+  <div class="grille">
+    <label>Sens
+      <select id="sens" data-reg="sens">
+        <option value="en-fr">Anglais → Français</option>
+        <option value="fr-en">Français → Anglais</option>
+      </select>
+    </label>
+    <label>Moteur
+      <select id="moteur" data-reg="moteur">
+        <option value="mymemory">MyMemory (gratuit, quota journalier)</option>
+        <option value="gemini">Gemini (clé gratuite, meilleure qualité)</option>
+      </select>
+    </label>
+  </div>
+  <p class="info">Le texte traduit est celui de l'onglet « Texte ». Connexion Internet requise.</p>
+  <div class="rangee">
+    <button id="btnTraduire" class="primaire">🌐 Traduire</button>
+    <button id="btnAnnulerTrad" class="danger" hidden>Arrêter</button>
+  </div>
+  <progress id="barreTrad" value="0" max="100" hidden></progress>
+  <p id="detailTrad" class="info"></p>
+  <textarea id="traduction" rows="14" placeholder="La traduction apparaît ici." spellcheck="false"></textarea>
+  <div class="rangee">
+    <button id="btnCopierTrad">Copier</button>
+    <button id="btnPartagerTrad">Partager</button>
+  </div>
+
+  <h2>Lecture vocale de la traduction</h2>
+  <div class="tts" data-cible="traduction"></div>
+</section>
+
+<!-- ============ EXPORT ============ -->
+<section id="tab-export" class="tab">
+  <div class="grille">
+    <label>Nom du fichier
+      <input type="text" id="nomExport" placeholder="document">
+    </label>
+    <label>Contenu
+      <select id="contenuExport">
+        <option value="orig">Texte reconnu</option>
+        <option value="trad">Traduction</option>
+        <option value="bi">Bilingue (original + traduction)</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="boutons-export">
+    <button data-fmt="txt">TXT</button>
+    <button data-fmt="md">Markdown</button>
+    <button data-fmt="html">HTML</button>
+    <button data-fmt="docx">Word (DOCX)</button>
+    <button data-fmt="pdf">PDF (texte)</button>
+    <button data-fmt="pdfocr">PDF consultable</button>
+    <button data-fmt="json">JSON</button>
+  </div>
+  <p class="info">
+    <strong>PDF consultable</strong> : conserve l'image du document et ajoute le texte reconnu
+    en calque invisible (recherche et copie possibles). Il nécessite d'avoir lancé la
+    reconnaissance dans cette session, avec « Conserver les images » activé.
+    Le fichier créé s'ouvre dans la feuille de partage : choisissez « Enregistrer » (Fichiers, Drive…).
+  </p>
+</section>
+
+<!-- ============ RÉGLAGES ============ -->
+<section id="tab-reglages" class="tab">
+  <h2>Options</h2>
+  <label class="case"><input type="checkbox" data-reg="marquerPages"> Marquer les pages dans le texte</label>
+  <label class="case"><input type="checkbox" data-reg="garderImages"> Conserver les images (PDF consultable)</label>
+
+  <h2>Traduction</h2>
+  <div class="grille">
+    <label>Clé API Gemini (facultative)
+      <input type="password" data-reg="gemKey" autocomplete="off" placeholder="Clé gratuite Google AI Studio">
+    </label>
+    <label>Modèle Gemini
+      <input type="text" data-reg="gemModele" autocomplete="off">
+    </label>
+    <label>E-mail MyMemory (facultatif, relève le quota)
+      <input type="email" data-reg="mmEmail" autocomplete="off" placeholder="vous@exemple.com">
+    </label>
+  </div>
+
+  <h2>Historique</h2>
+  <ul id="historique" class="historique"></ul>
+  <p class="info">Les textes sont conservés uniquement sur cet appareil.</p>
+</section>
+
+</main>
+
+<nav>
+  <button data-tab="source" class="active">Source</button>
+  <button data-tab="texte">Texte</button>
+  <button data-tab="traduction">Traduire</button>
+  <button data-tab="export">Export</button>
+  <button data-tab="reglages">Réglages</button>
+</nav>
+
+<div id="toast"></div>
+
+<script src="lib/pdf.min.js"></script>
+<script src="lib/jspdf.umd.min.js"></script>
+<script src="lib/jszip.min.js"></script>
+<script src="tesseract/tesseract.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
