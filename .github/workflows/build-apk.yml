@@ -43,9 +43,13 @@ jobs:
 
       - name: Créer le projet Android
         run: |
-          echo '{"appId":"com.mohamed.ocrpdf","appName":"OCR PDF","webDir":"www"}' > capacitor.config.json
+          echo '{"appId":"com.mohamed.ocrpdf","appName":"OCR PDF","webDir":"www","backgroundColor":"#0b1530"}' > capacitor.config.json
           npx cap add android
           npx cap sync android
+          # Écran de démarrage et fond bleu nuit (pas de flash blanc)
+          echo '<?xml version="1.0" encoding="utf-8"?><resources><color name="ocr_fond">#0B1530</color></resources>' > android/app/src/main/res/values/ocr_colors.xml
+          sed -i 's#<item name="android:background">@drawable/splash</item>#<item name="android:background">@color/ocr_fond</item>#' android/app/src/main/res/values/styles.xml
+          grep -n "ocr_fond" android/app/src/main/res/values/styles.xml
 
       - name: Compiler l'APK
         working-directory: android
