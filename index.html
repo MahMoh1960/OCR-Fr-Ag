@@ -3,8 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1f4e79">
+<meta name="theme-color" content="#0b1530">
 <title>OCR PDF</title>
+<style>html{background:#0b1530}html[data-theme=noir]{background:#000}</style>
+<script>try{var r=JSON.parse(localStorage.getItem('ocrpdf.reg')||'{}');document.documentElement.setAttribute('data-theme',r.theme==='noir'?'noir':'nuit');}catch(e){document.documentElement.setAttribute('data-theme','nuit');}</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -154,9 +156,18 @@
 
 <!-- ============ RÉGLAGES ============ -->
 <section id="tab-reglages" class="tab">
+  <h2>Apparence</h2>
+  <label>Thème
+    <select id="theme" data-reg="theme">
+      <option value="nuit">Bleu nuit, écriture jaune</option>
+      <option value="noir">Noir, écriture jaune</option>
+    </select>
+  </label>
+
   <h2>Options</h2>
   <label class="case"><input type="checkbox" data-reg="marquerPages"> Marquer les pages dans le texte</label>
   <label class="case"><input type="checkbox" data-reg="garderImages"> Conserver les images (PDF consultable)</label>
+  <label class="case"><input type="checkbox" data-reg="garderListes"> Conserver les puces et listes (traduction, nettoyage)</label>
 
   <h2>Traduction</h2>
   <div class="grille">

@@ -19,9 +19,17 @@ const DEF = {
   langOcr: 'fra+eng', mode: 'auto', resolution: '3', prepro: 'aucun',
   sens: 'en-fr', moteur: 'mymemory',
   gemKey: '', gemModele: 'gemini-2.5-flash', mmEmail: '',
-  marquerPages: true, garderImages: true
+  marquerPages: true, garderImages: true, garderListes: true, theme: 'nuit'
 };
 const reg = Object.assign({}, DEF, lire('ocrpdf.reg') || {});
+
+function appliquerTheme() {
+  const t = reg.theme === 'noir' ? 'noir' : 'nuit';
+  document.documentElement.setAttribute('data-theme', t);
+  const m = document.querySelector('meta[name=theme-color]');
+  if (m) m.setAttribute('content', t === 'noir' ? '#000000' : '#0b1530');
+}
+appliquerTheme();
 
 document.querySelectorAll('[data-reg]').forEach(el => {
   const k = el.dataset.reg;
@@ -30,6 +38,7 @@ document.querySelectorAll('[data-reg]').forEach(el => {
     reg[k] = el.type === 'checkbox' ? el.checked : el.value;
     ecrire('ocrpdf.reg', reg);
     if (k === 'sens') majLangueTrad();
+    if (k === 'theme') appliquerTheme();
   });
 });
 
@@ -361,6 +370,23 @@ $('btnAnnuler').addEventListener('click', () => { annule = true; message('Arrêt
 let texteAvant = null;
 function memoriser() { texteAvant = $('texte').value; }
 
+/* Puces et listes : « • », « - », « 1. », « a) » en début de ligne */
+const reListe = /^\s*(?:[•·▪■◦●○‣*]|[-–—]|\d{1,3}[.)]|[a-zA-Z][.)])\s+/;
+
+// Découpe un paragraphe en éléments : chaque puce démarre un nouvel élément,
+// les autres lignes sont rattachées à l'élément précédent.
+function segmenter(p) {
+  p = p.replace(/[ \t]+([•▪■◦●○‣])[ \t]+/g, '\n$1 ');          // puces restées au milieu d'une ligne
+  const segs = [];
+  p.split('\n').forEach(l => {
+    l = l.trim();
+    if (!l) return;
+    if (!segs.length || reListe.test(l)) segs.push(l);
+    else segs[segs.length - 1] += ' ' + l;
+  });
+  return segs;
+}
+
 function nettoyer(t) {
   t = t.replace(/([\p{L}])-\n([\p{L}])/gu, '$1$2');          // coupures de mots
   return t.split(/\n{2,}/).map(p => {
@@ -368,7 +394,7 @@ function nettoyer(t) {
     if (/^---.*---$/.test(l[0].trim()) && l[0].length < 120) {   // ligne « --- Page n --- » conservée
       return l[0].trim() + (l.length > 1 ? '\n' + l.slice(1).join(' ') : '');
     }
-    return p.replace(/\s*\n\s*/g, ' ');
+    return reg.garderListes ? segmenter(p).join('\n') : p.replace(/\s*\n\s*/g, ' ');
   }).join('\n\n').replace(/[ \t]{2,}/g, ' ').trim();
 }
 
@@ -587,6 +613,7 @@ async function traduireGemini(texte, de, vers) {
   const langs = { fr: 'français', en: 'anglais' };
   const prompt = `Traduis fidèlement le texte suivant de l'${langs[de]} vers le ${langs[vers]}. ` +
     `Conserve les paragraphes (séparés par une ligne vide) et recopie telles quelles les lignes de la forme « --- Page n --- ». ` +
+    (reg.garderListes ? `Conserve les listes : chaque puce ou numéro reste au début de sa propre ligne, avec le même symbole. ` : '') +
     `Réponds uniquement par la traduction, sans commentaire.\n\n${texte}`;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(reg.gemModele || 'gemini-2.5-flash')}:generateContent?key=${encodeURIComponent(reg.gemKey)}`;
   for (let essai = 0; essai < 3; essai++) {
@@ -608,7 +635,7 @@ async function traduireGemini(texte, de, vers) {
 function lotsGemini(paras, max) {
   const lots = []; let cur = [], len = 0;
   paras.forEach(p => {
-    const q = estSep(p) ? p : p.replace(/\s*\n\s*/g, ' ');
+    const q = estSep(p) ? p : (reg.garderListes ? segmenter(p).join('\n') : p.replace(/\s*\n\s*/g, ' '));
     if (len + q.length > max && cur.length) { lots.push(cur.join('\n\n')); cur = []; len = 0; }
     cur.push(q); len += q.length + 2;
   });
@@ -644,14 +671,22 @@ async function traduire() {
         $('detailTrad').textContent = `Paragraphe ${i + 1}/${paras.length}`;
         $('barreTrad').value = i / paras.length * 100;
         if (estSep(paras[i])) { sortie.push(paras[i]); continue; }
-        const phrases = decouperPhrases(paras[i].replace(/\s*\n\s*/g, ' '), 450);
-        const tr = [];
-        for (const ph of phrases) {
+        const segs = reg.garderListes ? segmenter(paras[i]) : [paras[i].replace(/\s*\n\s*/g, ' ')];
+        const lignesTr = [];
+        for (const seg of segs) {
           if (annulTrad) break;
-          tr.push(await traduireMM(ph, de, vers));
-          await pause(120);
+          const m = reg.garderListes ? seg.match(reListe) : null;
+          const puce = m ? m[0].trim() : '';
+          const contenu = m ? seg.slice(m[0].length) : seg;
+          const tr = [];
+          for (const ph of decouperPhrases(contenu, 450)) {
+            if (annulTrad) break;
+            tr.push(await traduireMM(ph, de, vers));
+            await pause(120);
+          }
+          lignesTr.push((puce ? puce + ' ' : '') + tr.join(' '));
         }
-        sortie.push(tr.join(' '));
+        sortie.push(lignesTr.join('\n'));
         $('traduction').value = sortie.join('\n\n');
       }
     }
@@ -930,5 +965,5 @@ function afficherHistorique() {
 afficherHistorique();
 
 /* petit accès pour les tests */
-window.OcrPdf = { nettoyer, decouperPhrases, analyserPlage, detecterLangue, san, construireDocx, construireHtml, construireMd, construireTxt, lotsGemini };
+window.OcrPdf = { segmenter, nettoyer, decouperPhrases, analyserPlage, detecterLangue, san, construireDocx, construireHtml, construireMd, construireTxt, lotsGemini };
 })();
